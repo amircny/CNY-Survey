@@ -1,100 +1,616 @@
-/* ===== Theme ===== */
-:root{
-  --bg:#0e1117;
+/* ===========================
+   CNY Survey Modern Theme
+   =========================== */
 
-  /* قاب بیرونی و پنل داخلی (قابل تغییر) */
-  --frame:#05b7ff;     /* outer cyan frame */
-  --panel:#0c2a36;     /* inner dark teal */
+:root {
 
-  --text:#e6edf3;
-  --muted:#9aa4b2;
-  --inner-border:#16485a;
+  --bg: #f4f8ff;
+  --primary: #1557ff;
+  --primary-dark: #0b3fc7;
 
-  --r-inner:28px;
-  --frame-thickness:6px; /* ضخامت قاب بیرونی */
+  --card: #ffffff;
+
+  --text: #14213d;
+  --muted: #64748b;
+
+  --border: #dbe7ff;
+
 }
 
-/* Base */
-html,body,[data-testid="stAppViewContainer"]{
-  background:var(--bg)!important;
-  color:var(--text)!important;
-  font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+
+/* ===========================
+   Global
+   =========================== */
+
+html,
+body,
+[data-testid="stAppViewContainer"] {
+
+    background: var(--bg) !important;
+
+    color: var(--text) !important;
+
+    font-family:
+    Inter,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+
+    direction: ltr !important;
+    text-align: left !important;
+
 }
 
-/* Header */
-.app-header{margin:10px 0 18px}
-.app-title{font-size:28px;font-weight:700}
-.app-subtitle{color:var(--muted);font-size:14px;margin-top:4px;font-weight:600}
 
-/* Meta row */
-.meta-row{display:flex;gap:12px;align-items:center;margin-bottom:12px}
-.badge{background:#4f46e5;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
-.api-endpoint{color:var(--muted);font-size:12px}
+/* Main container width */
 
-/* ===== THE KEY: style the Streamlit form itself =====
-   - یک قاب ضخیم فیروزه‌ای با box-shadow حلقوی
-   - پنل داخلی تیره با سایه‌های داخلی/خارجی
-*/
-[data-testid="stForm"]{
-  position:relative;
-  padding:24px !important;
-  border-radius:var(--r-inner) !important;
-  background:var(--panel) !important;
-  border:2px solid var(--inner-border);
+.block-container {
 
-  /* قاب بیرونی ضخیم + عمق */
-  box-shadow:
-    0 0 0 var(--frame-thickness) var(--frame),          /* قاب بیرونی */
-    inset 0 10px 18px rgba(255,255,255,.06),            /* highlight بالا */
-    inset 0 -18px 26px rgba(0,0,0,.55),                 /* shadow پایین */
-    0 24px 44px rgba(0,0,0,.35);                        /* سایه بیرونی نرم */
+    max-width: 1100px !important;
+
+    padding-top: 2rem !important;
+
 }
 
-/* سوال‌ها */
-.question{position:relative;padding-left:46px}
-.q-index{
-  position:absolute;top:0;left:0;width:34px;height:34px;border-radius:12px;
-  display:grid;place-items:center;background:#0f3a4a;color:#c3ccda;font-weight:700;font-size:13px;
-  border:1px solid #0b5c74;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)
-}
-.q-text{font-weight:700;margin-bottom:25px}
 
-/* Separator */
-.separator{border-bottom:1px dashed rgba(255,255,255,.08);margin:18px 0}
+/* ===========================
+   Header
+   =========================== */
 
-/* Widget sizing */
-.stRadio > div[role="radiogroup"] label p,
-.stMultiSelect label p, textarea{font-size:14px!important}
 
-/* Buttons */
-button[kind="secondary"]{
-  border:1px solid rgba(255,255,255,.08)!important;
-  background:#122a39!important
-}
-div.stButton>button{
-  border-radius:14px!important;padding:.7rem 1.1rem!important;font-weight:700!important
+.header-wrap img {
+
+    border-radius: 24px;
+
+    box-shadow:
+    0 15px 40px rgba(0,0,0,0.18);
+
 }
 
-/* Success */
-.success-banner{
-  margin-top:16px;padding:14px 16px;border-radius:12px;
-  background:rgba(34,197,94,.12);color:#b6f3c8;border:1px solid rgba(34,197,94,.35)
+
+/* Header text */
+
+.app-header {
+
+    margin-top:25px;
+
+    margin-bottom:30px;
+
 }
 
-/* Optional light mode */
-@media (prefers-color-scheme: light){
-  :root{ --bg:#f6f8fb; --frame:#27c3ff; --panel:#0d2a38; --text:#0f172a; --muted:#5b6472; --inner-border:#1c5f77; }
-}
-/* RTL fix for question header + number badge */
-.question {                 /* the title row */
-  position: relative;
-  padding-right: 72px !important;   /* leave space for the badge */
+
+.app-title {
+
+    font-size:34px;
+
+    font-weight:800;
+
+    color:#0b1f55;
+
 }
 
-.q-index {                  /* the round number badge */
-  position: absolute;
-  right: 12px !important;   /* move to right side */
-  left: auto !important;
-  top: -4px;                /* lift slightly */
-  transform: none;
+
+.app-subtitle {
+
+    margin-top:12px;
+
+    color:#475569;
+
+    font-size:15px;
+
+    line-height:1.8;
+
+}
+
+
+
+/* ===========================
+   Question counter
+   =========================== */
+
+
+.meta-row {
+
+    margin-bottom:15px;
+
+}
+
+
+.badge {
+
+    background:var(--primary);
+
+    color:white;
+
+    padding:7px 15px;
+
+    border-radius:30px;
+
+    font-size:14px;
+
+    font-weight:700;
+
+}
+
+
+
+/* ===========================
+   Survey Card
+   =========================== */
+
+
+[data-testid="stForm"] {
+
+
+    background:white !important;
+
+
+    border-radius:28px !important;
+
+
+    padding:35px !important;
+
+
+    border:1px solid var(--border);
+
+
+    box-shadow:
+
+    0 15px 45px rgba(21,87,255,0.12);
+
+
+}
+
+
+
+/* ===========================
+   Questions
+   =========================== */
+
+
+.question {
+
+    position:relative;
+
+    padding-left:75px;
+
+    min-height:55px;
+
+}
+
+
+.q-index {
+
+
+    position:absolute;
+
+
+    left:0 !important;
+
+    right:auto !important;
+
+
+    top:0;
+
+
+    width:45px;
+
+    height:45px;
+
+
+    border-radius:50%;
+
+
+    background:var(--primary);
+
+
+    color:white;
+
+
+    display:grid;
+
+
+    place-items:center;
+
+
+    font-size:15px;
+
+
+    font-weight:800;
+
+
+}
+
+
+
+.q-text {
+
+
+    color:#13234a;
+
+
+    font-size:17px;
+
+
+    font-weight:700;
+
+
+    padding-top:10px;
+
+
+}
+
+
+
+/* Divider */
+
+.separator {
+
+
+    border-bottom:
+
+    1px dashed #d7e2ff;
+
+
+    margin:
+
+    30px 0;
+
+
+}
+
+
+
+/* ===========================
+   Radio / Checkbox
+   =========================== */
+
+
+.stRadio label,
+.stCheckbox label {
+
+
+    color:#334155 !important;
+
+    font-size:16px !important;
+
+}
+
+
+
+/* ===========================
+   Buttons
+   =========================== */
+
+
+div.stButton > button {
+
+
+    border-radius:16px !important;
+
+
+    height:52px;
+
+
+    font-size:16px !important;
+
+
+    font-weight:700 !important;
+
+
+}
+
+
+/* Submit */
+
+button[kind="primary"] {
+
+
+    background:
+
+    var(--primary) !important;
+
+
+    color:white !important;
+
+
+    border:none !important;
+
+
+}
+
+
+button[kind="primary"]:hover {
+
+
+    background:
+
+    var(--primary-dark) !important;
+
+
+}
+
+
+
+/* Reset */
+
+button[kind="secondary"] {
+
+
+    background:white !important;
+
+
+    color:var(--primary) !important;
+
+
+    border:
+
+    2px solid var(--primary) !important;
+
+
+}
+
+
+
+/* ===========================
+   Success Message
+   =========================== */
+
+
+.success-banner {
+
+
+    margin-top:20px;
+
+
+    padding:18px;
+
+
+    border-radius:16px;
+
+
+    background:#dcfce7;
+
+
+    color:#166534;
+
+
+    border:1px solid #86efac;
+
+
+    font-weight:600;
+
+
+}
+
+/* Progress Bar */
+
+.progress-container{
+    margin-bottom:25px;
+}
+
+
+.progress-info{
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    margin-bottom:10px;
+
+}
+
+
+.progress-badge{
+
+    background:#1557ff;
+
+    color:white;
+
+    padding:8px 16px;
+
+    border-radius:25px;
+
+    font-weight:700;
+
+    font-size:14px;
+
+}
+
+
+.progress-percent{
+
+    color:#334155;
+
+    font-weight:700;
+
+}
+
+
+.progress-bar{
+
+    height:8px;
+
+    background:#dbe7ff;
+
+    border-radius:20px;
+
+    overflow:hidden;
+
+}
+
+
+.progress-fill{
+
+    height:100%;
+
+    background:#1557ff;
+
+    border-radius:20px;
+
+    transition:0.3s;
+
+}
+
+/* Remove old dark styles */
+
+[data-testid="stForm"] * {
+
+    color:inherit;
+
+}
+/* ===========================
+   Responsive Design
+   =========================== */
+
+
+/* Tablet */
+@media (max-width: 900px) {
+
+    .block-container {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+    }
+
+
+    .header-wrap {
+        width: 100% !important;
+    }
+
+
+    [data-testid="stForm"] {
+
+        padding: 25px !important;
+
+        border-radius: 20px !important;
+
+    }
+
+
+    .app-title {
+
+        font-size: 28px !important;
+
+    }
+
+}
+
+
+
+/* Mobile */
+@media (max-width: 600px) {
+
+
+    .block-container {
+
+        padding-left: 10px !important;
+
+        padding-right: 10px !important;
+
+    }
+
+
+
+    .header-wrap {
+
+        width:100% !important;
+
+    }
+
+
+    .header-wrap img {
+
+        border-radius:18px;
+
+    }
+
+
+
+    .app-title {
+
+        font-size:22px !important;
+
+        text-align:center !important;
+
+    }
+
+
+
+    .app-subtitle {
+
+        font-size:13px !important;
+
+        text-align:center !important;
+
+    }
+
+
+
+    [data-testid="stForm"] {
+
+        padding:18px !important;
+
+        border-radius:18px !important;
+
+    }
+
+
+
+    .question {
+
+        padding-left:55px !important;
+
+    }
+
+
+
+    .q-index {
+
+        width:38px !important;
+
+        height:38px !important;
+
+        font-size:13px !important;
+
+    }
+
+
+
+    .q-text {
+
+        font-size:15px !important;
+
+    }
+
+
+
+    /* Buttons stack on mobile */
+
+    div[data-testid="column"] {
+
+        width:100% !important;
+
+    }
+
+
+    button {
+
+        width:100% !important;
+
+        margin-top:8px !important;
+
+    }
+
+
+    .progress-info {
+
+        flex-direction:column;
+
+        gap:10px;
+
+        align-items:flex-start;
+
+    }
+
+
 }

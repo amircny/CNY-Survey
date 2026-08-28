@@ -1,6 +1,8 @@
 # survey_app.py — final (syntax-checked)
 import os, json, requests, streamlit as st
 from pathlib import Path
+import streamlit.components.v1 as components
+import time
 import os
 API = os.getenv("SURVEY_API", "http://localhost:8000")
 
@@ -8,26 +10,40 @@ API = os.getenv("SURVEY_API", "http://localhost:8000")
 st.markdown("""
 <style>
 html, body, [data-testid="stAppViewContainer"] {
-    direction: rtl;
-    text-align: right;
-    font-family: "Vazirmatn", "IRANSans", Tahoma, sans-serif;
+    direction: ltr;
+    text-align: left;
 }
 
 h1, h2, h3, h4, h5, h6, p, label, span, div {
-    direction: rtl;
-    text-align: right;
+    direction: ltr;
+    text-align: left;
 }
 
 /* دکمه‌ها و ورودی‌ها */
 button, [data-testid="stTextInput"], [data-testid="stTextArea"] {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: ltr !important;
+    text-align: left !important;
 }
 
 /* شماره سؤال در سمت راست */
 .q-index {
-    right: 0 !important;
-    left: auto !important;
+    left: 0 !important;
+    right: auto !important;
+}
+header[data-testid="stHeader"] {
+    display: none;
+}
+
+.block-container {
+    padding-top: 0rem !important;
+}
+
+#MainMenu {
+    display: none;
+}
+
+footer {
+    display: none;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -48,46 +64,134 @@ def find_img(name_candidates):
     return None
 
 banner = find_img(["header.png","header.jpg","header.jpeg"])
-icons  = find_img(["categories.png","categories.jpg","categories.jpeg"])
-
 # tighter spacing + not full screen
-st.markdown("""
-<style>
-.header-wrap img{border-radius:14px; box-shadow:0 6px 28px rgba(0,0,0,.25);}
-.header-wrap { margin: 0 auto 8px; width: 80%; }  /* 80% page width; change to taste */
-</style>
-""", unsafe_allow_html=True)
 
 left, center, right = st.columns([1,8,1])
 with center:
     st.markdown('<div class="header-wrap">', unsafe_allow_html=True)
-    if banner: st.image(banner, use_container_width=True)
-    if icons:  st.image(icons,  use_container_width=True)
+    if banner:
+     st.image(banner, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-if not banner or not icons:
-    st.caption(f"Put images in: {ASSETS} (header.png/jpg & categories.png/jpg)")
+if not banner:
+    st.caption(f"Put image in: {ASSETS} (header.png/jpg)")
 
-# Header
-st.markdown(
-    """
-<div class="app-header">
-  <div class="app-title">🚆پرسشنامه بررسی الگوی سفر مسافران</div>
-  <div class="app-subtitle">🚆
-آینده حمل و نقل ریلی
+if "survey_start_time" not in st.session_state:
+    st.session_state.survey_start_time = time.time()
+
+if "tracking_clicks" not in st.session_state:
+    st.session_state.tracking_clicks = 0
+
+if "first_click_time" not in st.session_state:
+    st.session_state.first_click_time = None
+
+#......................................................................
+components.html(
+"""
+<script>
+console.log("TRACKING LOADED");
+let mouseClicks = 0;
+let touchEvents = 0;
+
+let firstMouseClick = null;
+let firstTouch = null;
+let surveyStart = Date.now();
+
+function sendEvent(type, x, y){
+
+    let now = (Date.now() - surveyStart) / 1000;
 
 
- شرکت‌کنندگان عزیز،پیشاپیش از وقت و حمایت شما سپاسگزاریم
+    if(type === "click"){
 
-هدف از این نظرسنجی، شناسایی راهکارهایی برای بهبود حمل و نقل ریلی و تشویق مسافران بیشتر به استفاده از آن است. پرسشنامه، اهمیت و سطح رضایت از ۲۱ ویژگی مرتبط با بازار گردشگری را ارزیابی می‌کند.
+        mouseClicks++;
 
-این نظرسنجی توسط پروفسور فرانچسکا پالیارا از گروه مهندسی عمران، ساختمان و محیط زیست در دانشگاه ناپل فدریکو دوم و پروفسور کنسپسیون رومن گارسیا از گروه اقتصاد کاربردی در دانشگاه لاس پالماس د گران کاناریا برگزار می‌شود.
+        if(firstMouseClick === null){
+            firstMouseClick = now;
+        }
 
-لطفاً توجه داشته باشید که نتایج کاملاً ناشناس هستند و داده‌ها منحصراً برای اهداف تحقیقاتی استفاده خواهند شد.</div>
-</div>
+    }
+
+
+    if(type === "touch"){
+
+        touchEvents++;
+
+        if(firstTouch === null){
+            firstTouch = now;
+        }
+
+    }
+
+
+    fetch("http://localhost:8000/tracking_event", {
+
+        method:"POST",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify({
+
+            event:type,
+
+            mouse_clicks:mouseClicks,
+
+            touch_events:touchEvents,
+
+            first_mouse_click:firstMouseClick,
+
+            first_touch:firstTouch,
+
+            x:x,
+
+            y:y,
+
+            device:navigator.userAgent
+
+        })
+
+    });
+
+}
+
+
+
+// Mouse
+window.parent.document.addEventListener(
+"click",
+function(event){
+
+sendEvent(
+"click",
+event.clientX,
+event.clientY
+);
+
+});
+
+
+
+// Touch
+window.parent.document.addEventListener(
+"touchstart",
+function(event){
+
+sendEvent(
+"touch",
+event.touches[0].clientX,
+event.touches[0].clientY
+);
+
+});
+
+
+</script>
 """,
-    unsafe_allow_html=True,
+height=1,
 )
+#------------------------------------------------------------------
 
 @st.cache_data(ttl=5)
 def fetch_questions():
@@ -102,6 +206,16 @@ def submit_answers(payload: dict):
     r.raise_for_status()
     return r.json()
 
+def get_tracking_buffer():
+    r = requests.get(f"{API}/tracking_buffer", timeout=8)
+    r.raise_for_status()
+    return r.json()
+
+def send_tracking(payload: dict):
+    r = requests.post(f"{API}/tracking", json=payload, timeout=8)
+    r.raise_for_status()
+    return r.json()
+
 # Load questions
 try:
     questions = fetch_questions()
@@ -113,15 +227,16 @@ if not questions:
     st.info("No questions available yet.")
     st.stop()
 
+
 # Session
 if "answers" not in st.session_state:
     st.session_state.answers = {}
-
+# HERE PUT PROGRESS CODE
 # Meta row
 st.markdown(
     f"""
 <div class="meta-row">
-  <span class="badge">سوال : {len(questions)}</span>
+  <span class="badge">Questions: {len(questions)}</span>
 </div>
 """,
     unsafe_allow_html=True,
@@ -204,7 +319,40 @@ if "submitted" in locals() and submitted:
     else:
         try:
             payload = {"answers": st.session_state.answers}
+            survey_end_time = time.time()
+            survey_duration = survey_end_time - st.session_state.survey_start_time
+            tracking_data = get_tracking_buffer()
+            clicks = tracking_data.get("mouse_clicks", 0)
+            first_click = tracking_data.get("first_mouse_click")
+
+            touch_events = tracking_data.get("touch_events", 0)
+            first_touch = tracking_data.get("first_touch")
+
+            device = tracking_data.get("device", "unknown")
+            tracking_payload = {
+                "Recording": "CNY_Survey",
+                "Participant": "anonymous",
+                "TOI": "Survey",
+                "Interval": "Full Survey",
+                "AOI": "Survey Page",
+                "Duration_of_interval": survey_duration,
+                "Total_duration_of_fixations": None,
+                "Average_duration_of_fixations": None,
+                "Minimum_duration_of_fixations": None,
+                "Maximum_duration_of_fixations": None,
+                "Number_of_fixations": 0,
+                "Number_of_mouse_clicks": clicks,
+                "Time_to_first_mouse_click": first_click,
+                "Number_of_touch_events": touch_events,
+                "Time_to_first_touch": first_touch,
+                "Device_type": device
+            }
             res = submit_answers(payload)
+
+            if res.get("response_id"):
+                tracking_payload["response_id"] = res["response_id"]
+
+            send_tracking(tracking_payload)
             if res.get("ok"):
                 
                 st.markdown(

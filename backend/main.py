@@ -27,12 +27,14 @@ Base = declarative_base()
 class Response(Base):
     __tablename__ = "responses"
     id = Column(Integer, primary_key=True, index=True)
+    response_id = Column(Integer, nullable=True)
     ts = Column(String, nullable=False)
     payload = Column(JSON, nullable=False)
 
 class Question(Base):
     __tablename__ = "questions"
     id = Column(Integer, primary_key=True, index=True)
+    response_id = Column(Integer, nullable=True)
     text = Column(String, nullable=False)
     qtype = Column(String, nullable=False, default="single")   # single | multi | text
     qorder = Column(Integer, nullable=False, default=0)
@@ -40,15 +42,51 @@ class Question(Base):
 class Option(Base):
     __tablename__ = "options"
     id = Column(Integer, primary_key=True, index=True)
+    response_id = Column(Integer, nullable=True)
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
     code = Column(String, nullable=False)
     label = Column(String, nullable=False)
     oorder = Column(Integer, nullable=False, default=0)
 
-Base.metadata.create_all(engine)
 
+# ---------- Tables ----------
+class TrackingData(Base):
+    __tablename__ = "tracking_data"
+
+    id = Column(Integer, primary_key=True, index=True)
+    response_id = Column(Integer, nullable=True)
+    recording = Column(String, nullable=True)
+    participant = Column(String, nullable=True)
+    toi = Column(String, nullable=True)
+    interval = Column(String, nullable=True)
+    aoi = Column(String, nullable=True)
+
+    duration_of_interval = Column(String, nullable=True)
+    total_duration_of_fixations = Column(String, nullable=True)
+    average_duration_of_fixations = Column(String, nullable=True)
+    minimum_duration_of_fixations = Column(String, nullable=True)
+    maximum_duration_of_fixations = Column(String, nullable=True)
+
+    number_of_fixations = Column(Integer, nullable=True)
+    number_of_mouse_clicks = Column(Integer, nullable=True)
+    time_to_first_mouse_click = Column(String, nullable=True)
+    number_of_touch_events = Column(Integer, nullable=True)
+
+    time_to_first_touch = Column(String, nullable=True)
+    device = Column(String, nullable=True)
+
+Base.metadata.create_all(engine)    
 # ---------- App ----------
 app = FastAPI(title="Rail Survey API")
+
+tracking_buffer = {
+    "mouse_clicks": 0,
+    "touch_events": 0,
+    "first_mouse_click": None,
+    "first_touch": None,
+    "device": "unknown"
+}
+
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
@@ -69,17 +107,56 @@ def health(): return {"ok": True}
 def submit(payload: Dict[str, Any]):
     if not isinstance(payload, dict):
         raise HTTPException(400, "payload must be a JSON object")
+
     with SessionLocal() as s:
-        r = Response(ts=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), payload=payload)
-        s.add(r); s.commit()
-    return {"ok": True}
+        r = Response(
+            ts=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            payload=payload
+        )
+
+        s.add(r)
+        s.commit()
+        s.refresh(r)
+
+    return {
+        "ok": True,
+        "response_id": r.id
+    }
 
 @app.get("/responses")
 def responses() -> List[Dict[str, Any]]:
     with SessionLocal() as s:
         rows = s.execute(select(Response).order_by(Response.id)).scalars().all()
         return [{"id":r.id, "ts":r.ts, "payload":r.payload} for r in rows]
+    
+# ---------- Tracking Data ----------
+@app.post("/tracking")
+def save_tracking(payload: Dict[str, Any]):
+    with SessionLocal() as s:
+        tracking = TrackingData(
+            response_id=payload.get("response_id"),
+            recording=payload.get("Recording"),
+            participant=payload.get("Participant"),
+            toi=payload.get("TOI"),
+            interval=payload.get("Interval"),
+            aoi=payload.get("AOI"),
+            duration_of_interval=payload.get("Duration_of_interval"),
+            total_duration_of_fixations=payload.get("Total_duration_of_fixations"),
+            average_duration_of_fixations=payload.get("Average_duration_of_fixations"),
+            minimum_duration_of_fixations=payload.get("Minimum_duration_of_fixations"),
+            maximum_duration_of_fixations=payload.get("Maximum_duration_of_fixations"),
+            number_of_fixations=payload.get("Number_of_fixations"),
+            number_of_mouse_clicks=payload.get("Number_of_mouse_clicks"),
+            time_to_first_mouse_click=payload.get("Time_to_first_mouse_click"),
+            number_of_touch_events=payload.get("Number_of_touch_events"),
+            time_to_first_touch=payload.get("Time_to_first_touch"),
+            device=payload.get("Device_type"),
+        )
 
+        s.add(tracking)
+        s.commit()
+
+    return {"ok": True}
 # ---------- Questions CRUD ----------
 # ساخت سؤال
 @app.post("/question")
@@ -129,23 +206,7 @@ def get_questions():
             })
         return {"questions": out}
 
-# ویرایش سؤال (آپدیت کامل + جایگزینی گزینه‌ها)
-@app.put("/question/{qid}")
-def update_question(qid: int, q: Dict[str, Any]):
-    with SessionLocal() as s:
-        row = s.get(Question, qid)
-        if not row: raise HTTPException(404, "Question not found")
-
-        row.text = q.get("text", row.text)
-        row.qtype = q.get("qtype", row.qtype)
-        row.qorder = q.get("qorder", row.qorder)
-        # حذف گزینه‌های قبلی و ساخت جدید
-        s.execute(delete(Option).where(Option.question_id==qid))
-        opts = q.get("options") or []
-        for i,o in enumerate(opts):
-            s.add(Option(question_id=qid, code=o.get("code",f"opt{i}"), label=o.get("label",""), oorder=i))
-        s.add(row); s.commit()
-        return {"ok": True}
+#.
 
 # حذف سؤال
 @app.delete("/question/{qid}")
@@ -156,6 +217,54 @@ def delete_question(qid: int):
         if row: s.delete(row)
         s.commit()
     return {"ok": True}
+
+# ---------- Update Question ----------
+@app.put("/question/{qid}")
+def update_question(qid: int, payload: Dict[str, Any]):
+
+    with SessionLocal() as s:
+
+        qrow = s.get(Question, qid)
+
+        if not qrow:
+            raise HTTPException(404, "Question not found")
+
+
+        # update question fields
+        qrow.text = payload.get("text", qrow.text)
+        qrow.qtype = payload.get("qtype", qrow.qtype)
+        qrow.qorder = payload.get("qorder", qrow.qorder)
+
+
+        # delete old options
+        s.execute(
+            delete(Option).where(
+                Option.question_id == qid
+            )
+        )
+
+
+        # add new options
+        options = payload.get("options") or []
+
+        for i, o in enumerate(options):
+
+            s.add(
+                Option(
+                    question_id=qid,
+                    code=o.get("code", f"option_{i+1}"),
+                    label=o.get("label", ""),
+                    oorder=i
+                )
+            )
+
+
+        s.commit()
+
+        return {
+            "ok": True,
+            "id": qid
+        }
 # ---------- Excel Export ----------
 from io import BytesIO
 from fastapi.responses import StreamingResponse
@@ -233,73 +342,255 @@ def export_excel():
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers,
     )
-# ---------- Excel Export (FLAT) ----------
-from io import BytesIO
-from fastapi.responses import StreamingResponse
-import openpyxl, json
-from sqlalchemy import select
 
-@app.get("/export_flat.xlsx")
-def export_excel_flat():
-    # 1) load data
-    with SessionLocal() as s:
-        qrows = s.execute(select(Question).order_by(Question.qorder, Question.id)).scalars().all()
-        orows = s.execute(select(Option).order_by(Option.oorder, Option.id)).scalars().all()
-        rrows = s.execute(select(Response).order_by(Response.id)).scalars().all()
+#-----------------------------------------------------
+@app.post("/tracking_event")
+def tracking_event(payload: Dict[str, Any]):
+    print(payload)
+    event = payload.get("event")
 
-    # map: question id -> {code: label}
-    optmap = {}
-    for o in orows:
-        optmap.setdefault(o.question_id, {})[o.code] = o.label
+    if event == "click":
+        tracking_buffer["mouse_clicks"] += 1
 
-    # 2) prepare header: ts + each question text (in order)
-    header = ["ts"] + [q.text for q in qrows]
+        if tracking_buffer["first_mouse_click"] is None:
+            tracking_buffer["first_mouse_click"] = payload.get("first_mouse_click")
 
-    # 3) build rows: each response -> one row of human-readable labels
-    rows = []
-    for r in rrows:
-        ans = (r.payload or {}).get("answers", {})
-        row = [r.ts]
-        for q in qrows:
-            qid, qtype = q.id, q.qtype
-            v = ans.get(str(qid))
-            if v is None:
-                row.append("")  # no answer
-            elif qtype == "text":
-                row.append(str(v))
-            elif qtype == "multi":
-            # multi choice -> just save English codes
-              row.append(", ".join(v or []))
 
-            else:  # single choice -> save English code
-             row.append(v)
-        rows.append(row)
+    elif event == "touch":
+        tracking_buffer["touch_events"] += 1
 
-    # 4) write to Excel
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "flat"
-    ws.append(header)
-    for row in rows:
-        ws.append(row)
+        if tracking_buffer["first_touch"] is None:
+            tracking_buffer["first_touch"] = payload.get("first_touch")
 
-    # autosize columns (basic)
-    for col in ws.columns:
-        max_len = 0
-        col_letter = col[0].column_letter
-        for cell in col:
-            try:
-                max_len = max(max_len, len(str(cell.value or "")))
-            except:
-                pass
-        ws.column_dimensions[col_letter].width = min(60, max(10, max_len + 2))
 
-    buf = BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="survey_export_flat.xlsx"'},
+    tracking_buffer["device"] = payload.get(
+        "device",
+        "unknown"
     )
 
+
+    return {
+        "ok": True
+    }
+
+
+@app.get("/tracking_latest")
+def tracking_latest():
+    with SessionLocal() as s:
+        row = s.execute(
+            select(TrackingData)
+            .order_by(TrackingData.id.desc())
+        ).scalars().first()
+
+        if not row:
+            return {"message": "No tracking data"}
+
+        return {
+            "id": row.id,
+            "clicks": row.number_of_mouse_clicks,
+            "first_click": row.time_to_first_mouse_click,
+            "interval": row.interval,
+            "recording": row.recording
+        }
+# ---------- Complete Survey Export ----------
+@app.get("/export_complete.xlsx")
+def export_complete_excel():
+
+    with SessionLocal() as s:
+
+        questions = s.execute(
+            select(Question).order_by(Question.qorder, Question.id)
+        ).scalars().all()
+
+        options = s.execute(
+            select(Option)
+        ).scalars().all()
+
+        responses = s.execute(
+            select(Response).order_by(Response.id)
+        ).scalars().all()
+       
+
+    # تبدیل option code به label
+    option_map = {}
+
+    for o in options:
+        option_map.setdefault(o.question_id, {})
+        option_map[o.question_id][o.code] = o.label
+
+
+    wb = openpyxl.Workbook()
+
+    ws = wb.active
+    ws.title = "complete_survey"
+
+
+    # Header
+    headers = [
+        "Participant",
+        "Timestamp"
+    ]
+
+
+    for q in questions:
+        headers.append(
+            f"Q{q.id}: {q.text}"
+        )
+
+
+    # Tracking columns
+    headers.extend([
+    "Recording",
+    "TOI",
+    "Interval",
+    "AOI",
+    "Duration_of_interval",
+    "Number_of_mouse_clicks",
+    "Time_to_first_mouse_click",
+    "Number_of_touch_events",
+    "Time_to_first_touch",
+    "Device_type"
+    ])
+
+
+    ws.append(headers)
+
+
+    # Responses
+    for r in responses:
+
+        row = [
+            r.id,
+            r.ts
+        ]
+        
+        tracking = s.execute(
+            select(TrackingData)
+            .where(TrackingData.response_id == r.id)
+        ).scalars().first()
+
+        answers = (r.payload or {}).get(
+            "answers",
+            {}
+        )
+
+
+        for q in questions:
+
+            value = answers.get(
+                str(q.id),
+                ""
+            )
+
+
+            # تبدیل code به label
+            if isinstance(value, list):
+
+                labels = [
+                    option_map.get(q.id, {}).get(
+                        x,
+                        x
+                    )
+                    for x in value
+                ]
+
+                value = ", ".join(labels)
+
+
+            else:
+
+                value = option_map.get(
+                    q.id,
+                    {}
+                ).get(
+                    value,
+                    value
+                )
+
+
+            row.append(value)
+
+
+        # Tracking آخرین رکورد
+        if tracking:
+
+           row.extend([
+                tracking.recording,
+                tracking.toi,
+                tracking.interval,
+                tracking.aoi,
+                tracking.duration_of_interval,
+                tracking.number_of_mouse_clicks,
+                tracking.time_to_first_mouse_click,
+                tracking.number_of_touch_events,
+                tracking.time_to_first_touch,
+                tracking.device
+            ])
+
+        else:
+
+            row.extend([
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ])
+
+
+        ws.append(row)
+
+
+
+    # Auto width
+    for col in ws.columns:
+
+        length = max(
+            len(str(cell.value))
+            if cell.value else 0
+            for cell in col
+        )
+
+        ws.column_dimensions[
+            col[0].column_letter
+        ].width = min(length + 3, 50)
+
+
+
+    buf = BytesIO()
+
+    wb.save(buf)
+
+    buf.seek(0)
+
+
+    return StreamingResponse(
+        buf,
+        media_type=
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition":
+            'attachment; filename="CNY_Survey_Complete_Data.xlsx"'
+        }
+    )
+#..................................................................................
+@app.delete("/clear_data")
+def clear_data():
+
+    with SessionLocal() as s:
+
+        s.execute(delete(Response))
+        s.execute(delete(TrackingData))
+
+        s.commit()
+
+    return {
+        "ok": True,
+        "message": "All responses and tracking data deleted"
+    }
+#..............................................................................
+@app.get("/tracking_buffer")
+def get_tracking_buffer():
+    return tracking_buffer
